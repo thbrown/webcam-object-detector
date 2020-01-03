@@ -1,0 +1,110 @@
+<div id="text">
+  <h1>Tensor Flow Object Classifier</h1>
+  <p>Take screenshots from your webcam and run a Tensor Flow object detection model on it. Model can be found <a href="https://github.com/tensorflow/tfjs-models/tree/master/coco-ssd" target="_blank">here</a>. Detected objects are also printed to the console.</p>
+</div>
+<canvas style="display:none;"></canvas>
+<div id="screenshot">
+  <div id="loading-text">Loading...</div>
+  <video autoplay></video>
+  <img src="">
+</div>
+<div id="buttons">
+<button id="capture-button">Start Camera</button>
+<button id="screenshot-button">Take Screenshot</button>
+<input id="input-threshold" type="number" required name="price" min="0" value="0" step=".01" pattern="^\d*(\.\d{0,2})?$" max="1" min="0">
+</div>
+
+<script>
+  let loadedTF = false;
+  let loadedMod = false;
+  const loadedTensorFlow = function() {
+  	loadedTF = true;
+  	if(loadedTF && loadedMod) {
+  		document.getElementById("loading-text").innerHTML = "";
+  	}
+  };
+  const loadedModel = function() {
+  	loadedMod = true;
+  	 if(loadedTF && loadedMod) {
+  		document.getElementById("loading-text").innerHTML = "";
+  	}
+  };
+</script>
+
+<!-- Load TensorFlow.js. This is required to use coco-ssd model. -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs" onload="loadedTensorFlow()"> </script>
+<!-- Load the coco-ssd model. -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd" onload="loadedModel()"> </script>
+
+<script>
+
+  const captureVideoButton = document.querySelector('#capture-button');
+  const screenshotButton = document.querySelector('#screenshot-button');
+  const img = document.querySelector('#screenshot img');
+  const video = document.querySelector('#screenshot video');
+
+  const canvas = document.createElement('canvas');
+
+  const constraints = {
+    video: true
+  };
+
+  const model = cocoSsd.load();
+
+  const BOX_OUTLINE_WIDTH = 5;
+
+  let threshold = .5;
+  let onThresholdInput = function(e) {
+  	threshold = parseFloat(e.target.valueAsNumber);
+  }
+  let thresholdController = document.getElementById("input-threshold");
+  thresholdController.value = threshold;
+  thresholdController.addEventListener("input", onThresholdInput);
+
+  captureVideoButton.onclick = function() {
+    navigator.mediaDevices.getUserMedia(constraints).
+      then(handleSuccess).catch(handleError);
+  };
+
+  screenshotButton.onclick = video.onclick = function() {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    // Load the model.
+    model.then(model => {
+      // detect objects in the image.
+      model.detect(video).then(predictions => {
+        console.log('Predictions: ', predictions);
+
+        let context = canvas.getContext('2d');
+
+        // Draw the image
+        context.drawImage(video, 0, 0);
+
+        // Draw the bounding boxes
+        for(let i = 0; i < predictions.length; i++) {
+          let box = predictions[i].bbox;
+          let objectCategory = predictions[i].class;
+          let score = predictions[i].score;
+          if(score > threshold) {
+            context.beginPath();
+            context.rect(box[0], box[1], box[2], box[3]);
+            context.lineWidth = BOX_OUTLINE_WIDTH;
+            context.strokeStyle = 'white';
+            context.stroke();
+            context.fillStyle = 'white';
+            context.fillText(objectCategory + " - " + score, box[0] + BOX_OUTLINE_WIDTH, box[1] + BOX_OUTLINE_WIDTH*2);
+      	  }
+        }
+
+        img.src = canvas.toDataURL('image/webp');
+      });
+    });
+
+  };
+
+  function handleSuccess(stream) {
+    screenshotButton.disabled = false;
+    video.srcObject = stream;
+  }
+</script>
